@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Koib-V-4.7 — Конфигурация
-★ ДОБАВЛЕНО: параметры LLM-as-Judge валидатора и обрезки таблиц
-"""
 import os
 from pathlib import Path
 
@@ -24,7 +20,6 @@ OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-s
 
 PASSAGE_PREFIX = "passage: "
 QUERY_PREFIX = "query: "
-
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 TEXT_CHUNK_SIZE = int(os.getenv("TEXT_CHUNK_SIZE", "800"))
@@ -41,8 +36,6 @@ RERANKER_MODEL = os.getenv("RERANKER_MODEL", "DiTy/ru-reranker-base")
 USE_ONNX_RERANKER = os.getenv("USE_ONNX_RERANKER", "true").lower() == "true"
 USE_HYDE = os.getenv("USE_HYDE", "false").lower() == "true"
 BM25_USE_STOPWORDS = os.getenv("BM25_USE_STOPWORDS", "true").lower() == "true"
-
-# ★ НОВОЕ: лемматизация для FTS5 (рекомендуется true)
 BM25_USE_LEMMATIZATION = os.getenv("BM25_USE_LEMMATIZATION", "true").lower() == "true"
 
 GIGACHAT_CREDENTIALS = os.getenv("GIGACHAT_CREDENTIALS", "")
@@ -61,17 +54,13 @@ LOCAL_LLM_URL = os.getenv("LOCAL_LLM_URL", "http://localhost:11434")
 
 VALIDATION_IGNORE_QUOTES = os.getenv("VALIDATION_IGNORE_QUOTES", "true").lower() == "true"
 UNCERTAINTY_MIN_LENGTH = int(os.getenv("UNCERTAINTY_MIN_LENGTH", "50"))
-
-# ★ НОВОЕ: LLM-as-Judge валидация (вместо Regex-маркеров неуверенности)
 VALIDATION_USE_LLM_JUDGE = os.getenv("VALIDATION_USE_LLM_JUDGE", "false").lower() == "true"
-# Проверять ли цитаты в ответе против реальных источников из retrieval
 VALIDATION_CHECK_CITATIONS = os.getenv("VALIDATION_CHECK_CITATIONS", "true").lower() == "true"
 
 OCR_DPI = int(os.getenv("OCR_DPI", "200"))
 OCR_MIN_TEXT_CHARS = int(os.getenv("OCR_MIN_TEXT_CHARS", "50"))
 MIN_IMAGE_WIDTH = int(os.getenv("MIN_IMAGE_WIDTH", "80"))
 MIN_IMAGE_HEIGHT = int(os.getenv("MIN_IMAGE_HEIGHT", "80"))
-
 PARSING_ENGINE = os.getenv("PARSING_ENGINE", "pymupdf")
 
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
@@ -83,16 +72,11 @@ VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "")
 
 SEMANTIC_CACHE_ENABLED = os.getenv("SEMANTIC_CACHE_ENABLED", "true").lower() == "true"
 SEMANTIC_CACHE_THRESHOLD = float(os.getenv("SEMANTIC_CACHE_THRESHOLD", "0.92"))
-
 MAX_CONCURRENT_GENERATIONS = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "2"))
 
-# ★ НОВОЕ: лимиты для таблиц в промпте (защита от переполнения контекста)
 MAX_TABLE_ROWS_IN_PROMPT = int(os.getenv("MAX_TABLE_ROWS_IN_PROMPT", "30"))
 MAX_TABLE_TOKENS_IN_PROMPT = int(os.getenv("MAX_TABLE_TOKENS_IN_PROMPT", "1500"))
-
-# ★ НОВОЕ: U-Shape reordering для mitigation "Lost in the Middle"
 USE_USHAPED_CONTEXT = os.getenv("USE_USHAPED_CONTEXT", "true").lower() == "true"
-
 
 def get_device() -> str:
     try:
@@ -101,8 +85,6 @@ def get_device() -> str:
     except ImportError:
         return "cpu"
 
-
 def ensure_dirs() -> None:
-    for d in [DOCS_DIR, OUTPUT_DIR, INDEX_DIR, DOCSTORE_DIR,
-              FIGURES_DIR, LOGS_DIR, METADATA_DIR]:
+    for d in [DOCS_DIR, OUTPUT_DIR, INDEX_DIR, DOCSTORE_DIR, FIGURES_DIR, LOGS_DIR, METADATA_DIR]:
         d.mkdir(parents=True, exist_ok=True)
