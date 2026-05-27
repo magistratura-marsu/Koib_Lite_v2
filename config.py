@@ -63,7 +63,7 @@ VALIDATION_IGNORE_QUOTES = os.getenv("VALIDATION_IGNORE_QUOTES", "true").lower()
 UNCERTAINTY_MIN_LENGTH = int(os.getenv("UNCERTAINTY_MIN_LENGTH", "50"))
 
 # ★ НОВОЕ: LLM-as-Judge валидация (вместо Regex-маркеров неуверенности)
-VALIDATION_USE_LLM_JUDGE = os.getenv("VALIDATION_USE_LLM_JUDGE", "true").lower() == "true"
+VALIDATION_USE_LLM_JUDGE = os.getenv("VALIDATION_USE_LLM_JUDGE", "false").lower() == "true"
 # Проверять ли цитаты в ответе против реальных источников из retrieval
 VALIDATION_CHECK_CITATIONS = os.getenv("VALIDATION_CHECK_CITATIONS", "true").lower() == "true"
 
