@@ -1,5 +1,5 @@
-# Koib-V-4.6 — Production-ready RAG (2GB RAM optimized)
-# ★ Sparse search реализован через SQLite FTS5 (встроен в Python, zero-RAM)
+# Koib-V-4.7 — Production-ready RAG (2GB RAM optimized)
+# ★ ДОБАВЛЕНО: pymorphy2 для лемматизации в BM25 (критично для Recall)
 
 # PDF Parsing
 PyMuPDF>=1.23.8
@@ -28,6 +28,9 @@ urllib3>=2.0.0
 numpy>=1.24.0
 pandas>=2.0.0
 tabulate>=0.9.0
+
+# ★ НОВОЕ: Лемматизация русского языка для FTS5
+pymorphy2>=0.9.1
 
 # ONNX runtime for reranker quantization
 onnxruntime>=1.16.0
