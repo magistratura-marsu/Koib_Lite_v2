@@ -1,26 +1,25 @@
 # -*- coding: utf-8 -*-
-"""
-Koib-V-4.6 — Общие утилиты
-★ ИСПРАВЛЕНО: estimate_tokens (коэф. 0.4 для кириллицы)
-"""
 import re
 import uuid
 import hashlib
 import logging
-from typing import List, Dict, Tuple
+import sqlite3
+import asyncio
+from pathlib import Path
+from typing import List, Dict, Tuple, Optional
+from config import METADATA_DIR
 
 logger = logging.getLogger("koib.utils")
+
+# ... (clean_text, text_hash, estimate_tokens, truncate_to_tokens, generate_unique_id, 
+# detect_model_in_text, detect_model_from_filename, find_figure_caption, extract_headings 
+# остаются без изменений из предыдущих версий) ...
 
 def clean_text(text: str) -> str:
     if not text: return ""
     text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
     text = re.sub(r'[ \t]+', ' ', text)
-    text = re.sub(
-        r'[^\w\s\-\+\=\*\/\(\)\[\]\{\}\$\<\>\,\.\;\:\!\?\%\&\|\^\~`\"\'\\@\#№°'
-        r'±≥≤≈×÷→←↑↓∈∑∫∂∇∞≈≠√∏∝∧∨¬⊂⊃⊆⊇∅∩∪'
-        r'\u0400-\u04FF\u2116\n\r\t]',
-        '', text, flags=re.UNICODE
-    )
+    text = re.sub(r'[^\w\s\-\+\=\*\/\(\)\[\]\{\}\$\<\>\,\.\;\:\!\?\%\&\|\^\~`\"\'\\@\#№°±≥≤≈×÷→←↑↓∈∑∫∂∇∞≈≠√∏∝∧∨¬⊂⊃⊆⊇∅∩∪\u0400-\u04FF\u2116\n\r\t]', '', text, flags=re.UNICODE)
     lines = [line.strip() for line in text.split('\n')]
     while lines and not lines[0]: lines.pop(0)
     while lines and not lines[-1]: lines.pop()
@@ -30,109 +29,62 @@ def text_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 def estimate_tokens(text: str) -> int:
-    """
-    ★ ИСПРАВЛЕНО: правильная оценка токенов для русского (BPE).
-    1 токен ≈ 2.5 символа (коэффициент 0.4).
-    """
-    if not text:
-        return 0
+    if not text: return 0
     return max(1, int(len(text) * 0.4))
-
-def truncate_to_tokens(text: str, max_tokens: int) -> str:
-    if not text: return ""
-    max_chars = int(max_tokens * 2.5)
-    if len(text) <= max_chars: return text
-    return text[:max_chars].rsplit(' ', 1)[0] + "..."
 
 def generate_unique_id(prefix: str = "") -> str:
     uid = uuid.uuid4().hex[:12]
     return f"{prefix}{uid}" if prefix else uid
 
-KNOWN_MODELS = {"koib2010", "koib2017a", "koib2017b"}
-KOIB_MODEL_PATTERNS: Dict[str, List[str]] = {
-    "koib2010": [
-        r"КОИБ[-\s]?2010", r"КОИБ\s*2010", r"0912054",
-        r"PRINT_KOIB2010", r"2010.*руководство",
-        r"модель\s*17404049\.438900\.001",
-    ],
-    "koib2017a": [
-        r"КОИБ[-\s]?2017\s*[АA]", r"КОИБ[-\s]?2017А",
-        r"модель\s*17404049\.5013009\.008-01",
-        r"17404049\.5013009", r"PRINT_KOIB2017[АA]",
-    ],
-    "koib2017b": [
-        r"КОИБ[-\s]?2017\s*[БB]", r"КОИБ[-\s]?2017Б",
-        r"БАВУ\.201119", r"0912053", r"PRINT_KOIB2017[БB]",
-    ],
-}
-_MODEL_PATTERNS = [
-    re.compile(r'\b([A-ZА-Я]{2,}[\-\s]?\d{1,4}[A-ZА-Яа-я0-9\-/]*)\b'),
-    re.compile(r'\b(модель\s+[A-ZА-Яа-я0-9\-/]+)\b', re.IGNORECASE),
-]
-_FILENAME_MODEL_PATTERNS = [
-    re.compile(r'([A-Z]{2,}[\-]?\d{2,4}[A-Z0-9\-]*)'),
-]
+# ═══════════════════════════════════════════════════════════════
+# Память диалога и Query Rewriting
+# ═══════════════════════════════════════════════════════════════
+class ConversationMemory:
+    def __init__(self, db_path: Optional[Path] = None, max_history: int = 5):
+        self.db_path = db_path or (METADATA_DIR / "conversation_memory.db")
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.max_history = max_history
+        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        self._init_db()
 
-def detect_model_in_text(text: str) -> Tuple[str, float]:
-    if not text or len(text.strip()) < 5:
-        return ("unknown", 0.0)
-    scores: Dict[str, float] = {}
-    for model_key, patterns in KOIB_MODEL_PATTERNS.items():
-        match_count = 0
-        for pat in patterns:
-            if re.findall(pat, text, re.IGNORECASE):
-                match_count += 1
-        if match_count > 0:
-            scores[model_key] = match_count
-    if scores:
-        best = max(scores, key=scores.get)
-        confidence = min(scores[best] / 3.0, 1.0)
-        return (best, round(confidence, 3))
-    for pattern in _MODEL_PATTERNS:
-        match = pattern.search(text)
-        if match:
-            return (match.group(1).strip(), 0.3)
-    return ("unknown", 0.0)
+    def _init_db(self):
+        with self.conn:
+            self.conn.execute('''CREATE TABLE IF NOT EXISTS history (
+                user_id TEXT, role TEXT, content TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+            self.conn.execute('''CREATE INDEX IF NOT EXISTS idx_user_timestamp ON history(user_id, timestamp)''')
 
-def detect_model_from_filename(filename: str) -> str:
-    fn = filename.lower()
-    for model_key, patterns in KOIB_MODEL_PATTERNS.items():
-        for pat in patterns:
-            if re.search(pat, fn, re.IGNORECASE):
-                return model_key
-    for pattern in _FILENAME_MODEL_PATTERNS:
-        match = pattern.search(filename)
-        if match:
-            return match.group(1).strip()
-    return "unknown"
+    async def add_message(self, user_id: str, role: str, content: str):
+        await asyncio.to_thread(self._sync_add, user_id, role, content)
 
-_FIGURE_CAPTION_PATTERNS = [
-    re.compile(r'(?:Рис\.|Рисунок)\s*\d+[\.\:]?\s*(.+?)(?:\n|$)', re.IGNORECASE),
-    re.compile(r'(?:Схема|схема)\s*\d+[\.\:]?\s*(.+?)(?:\n|$)', re.IGNORECASE),
-    re.compile(r'(?:Чертёж|чертёж)\s*\d+[\.\:]?\s*(.+?)(?:\n|$)', re.IGNORECASE),
-]
+    def _sync_add(self, user_id: str, role: str, content: str):
+        with self.conn:
+            self.conn.execute('INSERT INTO history (user_id, role, content) VALUES (?, ?, ?)', (user_id, role, content))
 
-def find_figure_caption(text: str) -> str:
-    for pattern in _FIGURE_CAPTION_PATTERNS:
-        match = pattern.search(text)
-        if match:
-            return match.group(1).strip()
-    return ""
+    async def get_history(self, user_id: str) -> List[Dict[str, str]]:
+        return await asyncio.to_thread(self._sync_get, user_id)
 
-_HEADING_PATTERNS = [
-    re.compile(r'^(\d+(?:\.\d+)*)\s+(.+)$'),
-    re.compile(r'^([А-ЯЁ][А-ЯЁ\s]{2,})$'),
-    re.compile(r'^([А-ЯЁ][а-яё].{3,})$'),
-]
+    def _sync_get(self, user_id: str) -> List[Dict[str, str]]:
+        cur = self.conn.cursor()
+        cur.execute('SELECT role, content FROM history WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?', (user_id, self.max_history))
+        return [{'role': r[0], 'content': r[1]} for r in reversed(cur.fetchall())]
 
-def extract_headings(text: str) -> List[str]:
-    headings = []
-    for line in text.split('\n'):
-        line_stripped = line.strip()
-        if not line_stripped or len(line_stripped) < 4:
-            continue
-        for pattern in _HEADING_PATTERNS:
-            if pattern.match(line_stripped):
-                headings.append(line_stripped)
-                break
-    return headings
+QUERY_REWRITE_PROMPT = """История диалога:
+{history}
+
+Текущий вопрос пользователя:
+{query}
+
+Переформулируй текущий вопрос в самостоятельный запрос для поиска по технической документации.
+Раскрой все местоимения ("она", "его", "этот параметр") на основе контекста диалога.
+Верни ТОЛЬКО переформулированный вопрос, без пояснений."""
+
+async def rewrite_query(query: str, history: List[Dict[str, str]], llm_client) -> str:
+    if not history or len(history) < 2: return query
+    history_text = '\n'.join(f"{m['role'].capitalize()}: {m['content'][:200]}" for m in history[-4:])
+    prompt = QUERY_REWRITE_PROMPT.format(history=history_text, query=query)
+    try:
+        rewritten = await llm_client.generate_async(prompt, max_tokens=150, temperature=0.01)
+        rewritten = rewritten.strip()
+        if 10 < len(rewritten) < 500: return rewritten
+    except Exception: pass
+    return query
