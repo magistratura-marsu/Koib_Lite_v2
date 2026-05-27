@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Koib-V-4.6 — Конфигурация (оптимизировано для 2 ГБ RAM, production-ready)
-★ ИСПРАВЛЕНО: OCR_DPI снижен до 200 (экономия ~50% RAM при парсинге)
+Koib-V-4.7 — Конфигурация
+★ ДОБАВЛЕНО: параметры LLM-as-Judge валидатора и обрезки таблиц
 """
 import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
-
 DOCS_DIR = Path(os.getenv("KOIB_DOCS_DIR", str(DATA_DIR / "docs")))
 OUTPUT_DIR = Path(os.getenv("KOIB_OUTPUT_DIR", str(BASE_DIR / "output")))
+
 INDEX_DIR = OUTPUT_DIR / "index"
 DOCSTORE_DIR = OUTPUT_DIR / "docstore"
 FIGURES_DIR = OUTPUT_DIR / "figures"
@@ -24,6 +24,7 @@ OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-s
 
 PASSAGE_PREFIX = "passage: "
 QUERY_PREFIX = "query: "
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 TEXT_CHUNK_SIZE = int(os.getenv("TEXT_CHUNK_SIZE", "800"))
@@ -40,6 +41,9 @@ RERANKER_MODEL = os.getenv("RERANKER_MODEL", "DiTy/ru-reranker-base")
 USE_ONNX_RERANKER = os.getenv("USE_ONNX_RERANKER", "true").lower() == "true"
 USE_HYDE = os.getenv("USE_HYDE", "false").lower() == "true"
 BM25_USE_STOPWORDS = os.getenv("BM25_USE_STOPWORDS", "true").lower() == "true"
+
+# ★ НОВОЕ: лемматизация для FTS5 (рекомендуется true)
+BM25_USE_LEMMATIZATION = os.getenv("BM25_USE_LEMMATIZATION", "true").lower() == "true"
 
 GIGACHAT_CREDENTIALS = os.getenv("GIGACHAT_CREDENTIALS", "")
 GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat")
@@ -58,7 +62,11 @@ LOCAL_LLM_URL = os.getenv("LOCAL_LLM_URL", "http://localhost:11434")
 VALIDATION_IGNORE_QUOTES = os.getenv("VALIDATION_IGNORE_QUOTES", "true").lower() == "true"
 UNCERTAINTY_MIN_LENGTH = int(os.getenv("UNCERTAINTY_MIN_LENGTH", "50"))
 
-# ★ ИСПРАВЛЕНО: 200 DPI достаточно для Tesseract, экономит ~50% RAM vs 300 DPI
+# ★ НОВОЕ: LLM-as-Judge валидация (вместо Regex-маркеров неуверенности)
+VALIDATION_USE_LLM_JUDGE = os.getenv("VALIDATION_USE_LLM_JUDGE", "true").lower() == "true"
+# Проверять ли цитаты в ответе против реальных источников из retrieval
+VALIDATION_CHECK_CITATIONS = os.getenv("VALIDATION_CHECK_CITATIONS", "true").lower() == "true"
+
 OCR_DPI = int(os.getenv("OCR_DPI", "200"))
 OCR_MIN_TEXT_CHARS = int(os.getenv("OCR_MIN_TEXT_CHARS", "50"))
 MIN_IMAGE_WIDTH = int(os.getenv("MIN_IMAGE_WIDTH", "80"))
@@ -68,6 +76,7 @@ PARSING_ENGINE = os.getenv("PARSING_ENGINE", "pymupdf")
 
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8000"))
+
 VK_CONFIRM_CODE = os.getenv("VK_CONFIRM_CODE", "12345678")
 VK_GROUP_ID = os.getenv("VK_GROUP_ID", "")
 VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "")
@@ -75,8 +84,14 @@ VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "")
 SEMANTIC_CACHE_ENABLED = os.getenv("SEMANTIC_CACHE_ENABLED", "true").lower() == "true"
 SEMANTIC_CACHE_THRESHOLD = float(os.getenv("SEMANTIC_CACHE_THRESHOLD", "0.92"))
 
-# ★ НОВОЕ: жёсткий лимит одновременных генераций (защита от OOM-спайков)
 MAX_CONCURRENT_GENERATIONS = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "2"))
+
+# ★ НОВОЕ: лимиты для таблиц в промпте (защита от переполнения контекста)
+MAX_TABLE_ROWS_IN_PROMPT = int(os.getenv("MAX_TABLE_ROWS_IN_PROMPT", "30"))
+MAX_TABLE_TOKENS_IN_PROMPT = int(os.getenv("MAX_TABLE_TOKENS_IN_PROMPT", "1500"))
+
+# ★ НОВОЕ: U-Shape reordering для mitigation "Lost in the Middle"
+USE_USHAPED_CONTEXT = os.getenv("USE_USHAPED_CONTEXT", "true").lower() == "true"
 
 
 def get_device() -> str:
