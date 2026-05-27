@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Koib-V-4.6 — Модуль парсинга документов
+★ ИСПРАВЛЕНО: _is_scanned_page больше не отправляет страницы с логотипами в OCR
 ★ ИСПРАВЛЕНО: явный вызов gc.collect() после каждой страницы — защита от OOM
-★ ИСПРАВЛЕНО: явное удаление pixmap и изображений
 """
 import io
 import re
@@ -25,7 +25,6 @@ from .utils import (
 from config import OCR_DPI, OCR_MIN_TEXT_CHARS, MIN_IMAGE_WIDTH, MIN_IMAGE_HEIGHT, FIGURES_DIR
 
 logger = logging.getLogger("koib.parsing")
-
 
 @dataclass
 class DocumentElement:
@@ -51,11 +50,9 @@ class DocumentElement:
     def is_structured(self) -> bool:
         return self.element_type in ("table", "formula", "figure")
 
-
 def _expand_rect(rect: fitz.Rect, margin: float) -> fitz.Rect:
     return fitz.Rect(rect.x0 - margin, rect.y0 - margin,
                      rect.x1 + margin, rect.y1 + margin)
-
 
 def _is_scanned_page(page: fitz.Page, min_chars: int = OCR_MIN_TEXT_CHARS) -> bool:
     text = page.get_text("text").strip()
@@ -64,6 +61,7 @@ def _is_scanned_page(page: fitz.Page, min_chars: int = OCR_MIN_TEXT_CHARS) -> bo
     images = page.get_images(full=True)
     if not images:
         return len(text) < min_chars
+    
     page_area = page.rect.width * page.rect.height
     for img_info in images:
         try:
@@ -78,8 +76,10 @@ def _is_scanned_page(page: fitz.Page, min_chars: int = OCR_MIN_TEXT_CHARS) -> bo
             img.close()
         except Exception:
             continue
-    return True
-
+            
+    # ★ ИСПРАВЛЕНО: Если дошли сюда, значит на странице только мелкие картинки (логотипы/иконы).
+    # Это НЕ скан. Возвращаем False, чтобы не запускать тяжелый Tesseract OCR.
+    return False
 
 def _ocr_image(image_pil: Image.Image, lang: str = "rus+eng") -> str:
     if image_pil is None:
@@ -94,7 +94,6 @@ def _ocr_image(image_pil: Image.Image, lang: str = "rus+eng") -> str:
     except Exception as exc:
         logger.debug(f"Tesseract OCR error: {exc}")
     return ""
-
 
 def _extract_tables_from_page(page: fitz.Page) -> List[Dict[str, Any]]:
     tables = []
@@ -129,7 +128,6 @@ def _extract_tables_from_page(page: fitz.Page) -> List[Dict[str, Any]]:
         logger.debug(f"Ошибка поиска таблиц: {exc}")
     return tables
 
-
 def _detect_formulas_in_text(text: str) -> List[Dict[str, Any]]:
     formulas = []
     for match in re.finditer(r'\$([^$]+)\$', text):
@@ -162,7 +160,6 @@ def _detect_formulas_in_text(text: str) -> List[Dict[str, Any]]:
                 })
     return formulas
 
-
 def parse_pdf(file_path: Path, model_hint: str = "") -> List[DocumentElement]:
     if not file_path.exists():
         logger.error(f"Файл не найден: {file_path}")
@@ -170,7 +167,6 @@ def parse_pdf(file_path: Path, model_hint: str = "") -> List[DocumentElement]:
     filename = file_path.name
     model = model_hint or detect_model_from_filename(filename)
     elements: List[DocumentElement] = []
-
     try:
         doc = fitz.open(str(file_path))
     except Exception as exc:
@@ -178,7 +174,6 @@ def parse_pdf(file_path: Path, model_hint: str = "") -> List[DocumentElement]:
         return []
 
     logger.info(f"Парсинг PDF: {filename} ({len(doc)} стр.)")
-
     full_text_sample = ""
     for page in doc:
         full_text_sample += page.get_text("text") + "\n"
@@ -191,7 +186,6 @@ def parse_pdf(file_path: Path, model_hint: str = "") -> List[DocumentElement]:
         page = doc[page_num]
         page_text = page.get_text("text").strip()
 
-        # ★ ИСПРАВЛЕНО: OCR с контролируемым жизненным циклом объектов
         if _is_scanned_page(page):
             pix = page.get_pixmap(dpi=OCR_DPI)
             try:
@@ -206,7 +200,6 @@ def parse_pdf(file_path: Path, model_hint: str = "") -> List[DocumentElement]:
                     ))
                 img.close()
             finally:
-                # ★ КРИТИЧНО: немедленное освобождение битмапа (~15-25 МБ)
                 del pix
                 gc.collect()
             continue
@@ -271,10 +264,8 @@ def parse_pdf(file_path: Path, model_hint: str = "") -> List[DocumentElement]:
                 logger.debug(f"Ошибка изображения: {exc}")
             finally:
                 if img is not None:
-                    try:
-                        img.close()
-                    except Exception:
-                        pass
+                    try: img.close()
+                    except Exception: pass
 
         if page_text:
             for heading in headings:
@@ -292,16 +283,12 @@ def parse_pdf(file_path: Path, model_hint: str = "") -> List[DocumentElement]:
                     model=detected_model if conf > 0.3 else model,
                     heading=current_heading,
                 ))
-
-        # ★ ИСПРАВЛЕНО: принудительная сборка мусора после каждой страницы
         gc.collect()
 
     doc.close()
-    # ★ Финальная очистка после всего документа
     gc.collect()
     logger.info(f"Извлечено {len(elements)} элементов из {filename}")
     return elements
-
 
 def parse_docx(file_path: Path, model_hint: str = "") -> List[DocumentElement]:
     if not file_path.exists():
@@ -310,7 +297,6 @@ def parse_docx(file_path: Path, model_hint: str = "") -> List[DocumentElement]:
     filename = file_path.name
     model = model_hint or detect_model_from_filename(filename)
     elements: List[DocumentElement] = []
-
     try:
         doc = DocxDocument(str(file_path))
     except Exception as exc:
@@ -319,7 +305,6 @@ def parse_docx(file_path: Path, model_hint: str = "") -> List[DocumentElement]:
 
     logger.info(f"Парсинг DOCX: {filename}")
     current_heading = ""
-
     for table_idx, table in enumerate(doc.tables):
         rows_data = [[cell.text.strip() for cell in row.cells] for row in table.rows]
         if not rows_data:
@@ -377,11 +362,9 @@ def parse_docx(file_path: Path, model_hint: str = "") -> List[DocumentElement]:
                 model=detected_model if conf > 0.3 else model,
                 heading=current_heading,
             ))
-
     gc.collect()
     logger.info(f"Извлечено {len(elements)} элементов из {filename}")
     return elements
-
 
 def parse_document(file_path: Path, engine: Optional[str] = None,
                    model_hint: str = "") -> List[DocumentElement]:
