@@ -6,7 +6,6 @@ BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 DOCS_DIR = Path(os.getenv("KOIB_DOCS_DIR", str(DATA_DIR / "docs")))
 OUTPUT_DIR = Path(os.getenv("KOIB_OUTPUT_DIR", str(BASE_DIR / "output")))
-
 INDEX_DIR = OUTPUT_DIR / "index"
 DOCSTORE_DIR = OUTPUT_DIR / "docstore"
 FIGURES_DIR = OUTPUT_DIR / "figures"
@@ -17,7 +16,6 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gigachat")
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "local")
 LOCAL_EMBEDDING_MODEL = os.getenv("LOCAL_EMBEDDING_MODEL", "intfloat/multilingual-e5-small")
 OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
-
 PASSAGE_PREFIX = "passage: "
 QUERY_PREFIX = "query: "
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -72,13 +70,21 @@ VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "")
 
 SEMANTIC_CACHE_ENABLED = os.getenv("SEMANTIC_CACHE_ENABLED", "true").lower() == "true"
 SEMANTIC_CACHE_THRESHOLD = float(os.getenv("SEMANTIC_CACHE_THRESHOLD", "0.92"))
-MAX_CONCURRENT_GENERATIONS = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "2"))
 
+MAX_CONCURRENT_GENERATIONS = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "2"))
 MAX_TABLE_ROWS_IN_PROMPT = int(os.getenv("MAX_TABLE_ROWS_IN_PROMPT", "30"))
 MAX_TABLE_TOKENS_IN_PROMPT = int(os.getenv("MAX_TABLE_TOKENS_IN_PROMPT", "1500"))
 USE_USHAPED_CONTEXT = os.getenv("USE_USHAPED_CONTEXT", "true").lower() == "true"
 
+# ★ ИЗМЕНЕНО: параметры индексации (настраиваются под железо)
+INDEXING_BATCH_SIZE = int(os.getenv("INDEXING_BATCH_SIZE", "256"))       # 256 для CPU/VPS, 1024+ для GPU
+INDEXING_FLUSH_THRESHOLD = int(os.getenv("INDEXING_FLUSH_THRESHOLD", "2000"))  # 2000 для 2GB, 50000 для 20GB
+INDEXING_DEVICE = os.getenv("INDEXING_DEVICE", "auto")                   # auto | cpu | cuda
+
 def get_device() -> str:
+    """Определить устройство для вычислений."""
+    if INDEXING_DEVICE != "auto":
+        return INDEXING_DEVICE
     try:
         import torch
         return "cuda" if torch.cuda.is_available() else "cpu"
