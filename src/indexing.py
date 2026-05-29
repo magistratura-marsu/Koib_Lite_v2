@@ -7,7 +7,7 @@ from config import (
     INDEX_DIR, DOCSTORE_DIR, EMBEDDING_PROVIDER,
     LOCAL_EMBEDDING_MODEL, OPENAI_EMBEDDING_MODEL, OPENAI_API_KEY,
     BM25_USE_STOPWORDS, BM25_USE_LEMMATIZATION,
-    INDEXING_BATCH_SIZE, INDEXING_FLUSH_THRESHOLD, get_device,  # ★ ИЗМЕНЕНО
+    INDEXING_BATCH_SIZE, INDEXING_FLUSH_THRESHOLD, get_device,
 )
 
 logger = logging.getLogger("koib.indexing")
@@ -18,19 +18,18 @@ def get_global_embeddings():
     global _GLOBAL_EMBEDDINGS
     if _GLOBAL_EMBEDDINGS is not None:
         return _GLOBAL_EMBEDDINGS
-
     if EMBEDDING_PROVIDER == "local":
         from langchain_huggingface import HuggingFaceEmbeddings
-        device = get_device()  # ★ ИЗМЕНЕНО: автоопределение cuda/cpu
+        device = get_device()
         logger.info(f"Загрузка embedding-модели '{LOCAL_EMBEDDING_MODEL}' на устройстве: {device} "
                     f"(batch_size={INDEXING_BATCH_SIZE})")
         _GLOBAL_EMBEDDINGS = HuggingFaceEmbeddings(
             model_name=LOCAL_EMBEDDING_MODEL,
-            model_kwargs={"device": device},                       # ★ ИЗМЕНЕНО: было "cpu"
+            model_kwargs={"device": device},
             encode_kwargs={
                 "normalize_embeddings": True,
-                "batch_size": INDEXING_BATCH_SIZE,                 # ★ ИЗМЕНЕНО: ускоряет в разы на GPU
-                "show_progress_bar": True,                         # ★ ИЗМЕНЕНО: видим прогресс
+                "batch_size": INDEXING_BATCH_SIZE,
+                "show_progress_bar": True,
             },
         )
     elif EMBEDDING_PROVIDER == "openai":
@@ -41,9 +40,7 @@ def get_global_embeddings():
         )
     else:
         raise ValueError(f"Unknown EMBEDDING_PROVIDER: {EMBEDDING_PROVIDER}")
-
     return _GLOBAL_EMBEDDINGS
-
 
 RU_STOPWORDS = {"и", "в", "на", "с", "по", "для", "из", "к", "от", "о", "об", "а", "но", "да",
                 "не", "что", "как", "это", "то", "же", "бы", "вы", "мы", "он", "она", "они", "оно",
@@ -58,7 +55,6 @@ RU_STOPWORDS = {"и", "в", "на", "с", "по", "для", "из", "к", "от"
 _TOKEN_RE = re.compile(r'[а-яёa-z0-9]+', re.IGNORECASE)
 _MORPH_ANALYZER = None
 
-
 def _get_morph():
     global _MORPH_ANALYZER
     if _MORPH_ANALYZER is None and BM25_USE_LEMMATIZATION:
@@ -69,7 +65,6 @@ def _get_morph():
             pass
     return _MORPH_ANALYZER
 
-
 def _lemmatize_token(token: str) -> str:
     morph = _get_morph()
     if morph is None:
@@ -79,22 +74,20 @@ def _lemmatize_token(token: str) -> str:
     except Exception:
         return token
 
-
-def tokenize_ru(text: str) -> str:
+def _get_processed_tokens(text: str) -> List[str]:
+    """Базовая токенизация: lower, regex, stopwords, lemmatization."""
     if not text:
-        return ""
+        return []
     raw_tokens = [t.lower() for t in _TOKEN_RE.findall(text) if len(t) > 1]
     if BM25_USE_STOPWORDS:
         raw_tokens = [t for t in raw_tokens if t not in RU_STOPWORDS]
-    tokens = [_lemmatize_token(t) for t in raw_tokens] if BM25_USE_LEMMATIZATION else raw_tokens
-    return " ".join(tokens)
+    return [_lemmatize_token(t) for t in raw_tokens] if BM25_USE_LEMMATIZATION else raw_tokens
 
+def tokenize_ru(text: str) -> str:
+    return " ".join(_get_processed_tokens(text))
 
 def prepare_fts_query(query: str) -> str:
-    raw_tokens = [t.lower() for t in _TOKEN_RE.findall(query) if len(t) > 1]
-    if BM25_USE_STOPWORDS:
-        raw_tokens = [t for t in raw_tokens if t not in RU_STOPWORDS]
-    tokens = [_lemmatize_token(t) for t in raw_tokens] if BM25_USE_LEMMATIZATION else raw_tokens
+    tokens = _get_processed_tokens(query)
     if not tokens:
         return ""
     seen, unique = set(), []
@@ -103,7 +96,6 @@ def prepare_fts_query(query: str) -> str:
             seen.add(t)
             unique.append(t)
     return " OR ".join(f'"{t}"' for t in unique)
-
 
 class DocStore:
     def __init__(self, db_path: Optional[Path] = None):
@@ -132,7 +124,6 @@ class DocStore:
         cur.execute("SELECT content FROM docstore WHERE chunk_id = ?", (chunk_id,))
         row = cur.fetchone()
         return row[0] if row else None
-
 
 class BM25FTSIndex:
     def __init__(self, db_path: Optional[Path] = None):
@@ -201,7 +192,6 @@ class BM25FTSIndex:
         row = cur.fetchone()
         return row[0] if row else 0
 
-
 class IndexBuilder:
     def __init__(self, output_dir: Optional[Path] = None):
         self.output_dir = Path(output_dir) if output_dir else INDEX_DIR
@@ -222,9 +212,7 @@ class IndexBuilder:
                 self._text_docs.append(lc_doc)
             else:
                 self._summary_docs.append(lc_doc)
-        # ★ ИЗМЕНЕНО: порог сброса теперь настраивается через INDEXING_FLUSH_THRESHOLD
-        # Для 2 ГБ RAM (VPS): 2000 (защита от OOM)
-        # Для 20 ГБ RAM (PC): 50000 (макс. скорость, меньше I/O)
+        
         if len(self._text_docs) + len(self._summary_docs) > INDEXING_FLUSH_THRESHOLD:
             self._flush_vectorstores()
 
@@ -241,6 +229,7 @@ class IndexBuilder:
                     self.text_vectorstore.add_documents(self._text_docs)
                 self.text_vectorstore.save_local(str(self.output_dir), index_name="text_index")
                 self._text_docs = []
+
             if self._summary_docs:
                 if self.summary_vectorstore is None:
                     self.summary_vectorstore = FAISS.from_documents(self._summary_docs, embeddings)
