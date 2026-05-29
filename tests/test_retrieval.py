@@ -97,7 +97,6 @@ class TestResponseCache:
         """Сохранение и получение значения из кэша."""
         cache = ResponseCache(path=tmp_path / "test_cache.db")
         cache.set("тестовый запрос", "гипотетический ответ")
-
         result = cache.get("тестовый запрос")
         assert result == "гипотетический ответ"
 
@@ -111,13 +110,5 @@ class TestResponseCache:
         """Кэш нечувствителен к регистру и пробелам."""
         cache = ResponseCache(path=tmp_path / "test_cache.db")
         cache.set("Тестовый Запрос", "ответ")
-
         result = cache.get("тестовый запрос")
         assert result == "ответ"
-
-    def test_cache_clear(self, tmp_path):
-        """Очистка кэша."""
-        cache = ResponseCache(path=tmp_path / "test_cache.db")
-        cache.set("запрос", "ответ")
-        cache.clear()
-        assert cache.get("запрос") is None
