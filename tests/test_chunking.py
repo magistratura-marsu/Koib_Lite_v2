@@ -35,17 +35,16 @@ class TestSplitTextSemantic:
     def test_multiple_paragraphs(self):
         """Несколько абзацев должны разбиваться корректно."""
         para = "Абзац текста с достаточной длиной для обработки. " * 10
-        text = f"{para}\n\n{para}\n\n{para}"
+        text = f"{para}\n{para}\n{para}"
         result = _split_text_semantic(text, max_tokens=200)
         assert len(result) >= 2
 
     def test_overlap(self):
         """Перекрытие между чанками должно сохраняться."""
         para = "Уникальный абзац с текстом для проверки перекрытия. " * 10
-        text = f"{para}\n\n{para}\n\n{para}"
+        text = f"{para}\n{para}\n{para}"
         result = _split_text_semantic(text, max_tokens=200, overlap_tokens=50)
         if len(result) >= 2:
-            # Перекрытие не гарантируется точно, но чанков должно быть > 1
             assert len(result) >= 2
 
 
@@ -116,7 +115,7 @@ class TestSmartChunker:
         chunks = chunker.chunk_elements(elements)
         assert len(chunks) == 1
         assert chunks[0].chunk_type == "table"
-        assert chunks[0].full_content is not None  # Полный контент в DocStore
+        assert chunks[0].full_content is not None
 
     def test_mixed_elements(self):
         """Смешанные элементы (текст + таблица)."""
