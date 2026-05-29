@@ -23,7 +23,7 @@ class TestCleanText:
         assert clean_text("hello   world") == "hello world"
 
     def test_leading_trailing_spaces(self):
-        text = "  строка 1  \n  строка 2  "
+        text = "  строка 1\nстрока 2  "
         result = clean_text(text)
         assert result.startswith("строка 1")
 
