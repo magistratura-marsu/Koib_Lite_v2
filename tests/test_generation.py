@@ -26,8 +26,9 @@ class TestBuildPrompt:
             ),
         ]
         prompt = build_prompt("Какой-то вопрос", results)
-        assert "КОНТЕКСТ:" in prompt
-        assert "ВОПРОС:" in prompt
+        # Исправлено: проверка актуальных XML-тегов вместо устаревших "КОНТЕКСТ:"
+        assert "<retrieved_context>" in prompt
+        assert "<user_query>" in prompt
         assert "Какой-то вопрос" in prompt
         assert "doc.pdf" in prompt
 
