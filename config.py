@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
+from dotenv import load_dotenv
+load_dotenv()  # Принудительно загружает переменные из .env
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
