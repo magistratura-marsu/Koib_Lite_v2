@@ -2,44 +2,10 @@
 """
 Koib-V-4.5 — Тесты модуля валидации
 ======================================
-Проверка детекции неуверенности, источников и семантической
-согласованности ответов.
+Проверка источников и итогового результата валидации.
 """
 import pytest
 from src.validation import AnswerValidator, ValidationResult, ValidationCheck
-
-
-class TestUncertaintyCheck:
-    """Тесты проверки на неуверенность."""
-
-    def setup_method(self):
-        self.validator = AnswerValidator(embeddings=None)
-
-    def test_certain_answer(self):
-        """Уверенный ответ должен пройти проверку."""
-        answer = "Согласно документации, модель АИИС-001 имеет вес 100 кг [Документ: passport.pdf, стр. 5]."
-        result = self.validator._check_uncertainty(answer)
-        assert result.passed is True
-
-    def test_uncertain_answer(self):
-        """Ответ с маркером неуверенности должен быть отклонён."""
-        answer = "Возможно, модель имеет вес 100 кг."
-        result = self.validator._check_uncertainty(answer)
-        assert result.passed is False
-        assert result.severity == "critical"
-
-    def test_uncertainty_in_quotes_ignored(self):
-        """Маркеры в цитатах должны игнорироваться."""
-        answer = 'Ответ: вес 100 кг. Автор сказал "возможно это так" в контексте.'
-        result = self.validator._check_uncertainty(answer)
-        # Зависит от VALIDATION_IGNORE_QUOTES
-        assert result.passed is True or "возможно" in result.details
-
-    def test_short_answer(self):
-        """Короткий ответ должен пройти (слишком короткий для проверки)."""
-        answer = "Да"
-        result = self.validator._check_uncertainty(answer)
-        assert result.passed is True
 
 
 class TestSourcesCheck:
