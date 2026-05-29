@@ -1,25 +1,44 @@
-# Koib-V-4.8 — Production-ready RAG (2GB RAM optimized)
+# ═══════════════════════════════════════════════════════════
+# Koib-V-4.8 — Production-ready RAG (Optimized for 2GB RAM VPS)
+# ═══════════════════════════════════════════════════════════
+# ⚠️ ВАЖНО ДЛЯ VPS: Сначала установите легкую CPU-only версию PyTorch,
+# чтобы pip не скачал 2.5 ГБ CUDA-зависимостей:
+# 
+# pip install torch --index-url https://download.pytorch.org/whl/cpu
+# pip install -r requirements.txt
+# ═══════════════════════════════════════════════════════════
+
+# === Парсинг документов (PDF, DOCX, OCR) ===
 PyMuPDF>=1.23.8
+python-docx>=1.1.0
 Pillow>=10.0.0
 pytesseract>=0.3.10
-python-docx>=1.1.0
-langchain-community>=0.0.30
+
+# === NLP и Морфология ===
+pymorphy2>=0.9.1
+
+# === Векторный поиск и LLM-интеграции (LangChain) ===
 langchain-core>=0.1.0
+langchain-community>=0.0.30
 langchain-huggingface>=0.0.1
 faiss-cpu>=1.7.4
+sentence-transformers>=2.2.2
+onnxruntime>=1.16.0
+
+# === Опционально: OpenAI (Раскомментируйте, если LLM_PROVIDER=openai) ===
+# openai>=1.0.0
+# langchain-openai>=0.0.5
+
+# === API сервер (FastAPI) ===
 fastapi>=0.103.0
 uvicorn[standard]>=0.23.2
 aiohttp>=3.9.0
-requests>=2.31.0
-urllib3>=2.0.0
+pydantic>=2.0.0
+
+# === Утилиты и конфигурация ===
 numpy>=1.24.0
-pandas>=2.0.0
-tabulate>=0.9.0
-pymorphy2>=0.9.1
-onnxruntime>=1.16.0
+python-dotenv>=1.0.0
+
+# === Тестирование ===
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
-cachetools>=5.3.0
-pydantic>=2.0.0
-sentence-transformers>=2.2.2
-python-dotenv>=1.0.0
